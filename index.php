@@ -7,17 +7,15 @@
  * EXAMPLE
  */
 
-$debug = true;
-$fake = true;
+use josecarlosphp\usefulcron\Config;
+use josecarlosphp\usefulcron\UsefulCron;
 
 require 'vendor/autoload.php';
-//require 'src/UsefulCron.php';
 
-$usefulCron = new josecarlosphp\usefulcron\UsefulCron();
+$config = new Config();
+$config->debug(true);
+$config->fake(true);
+$config->addDirToClean('./log', 0);
 
-$usefulCron->checkAuth('');
-
-$usefulCron->debug($debug);
-$usefulCron->fake($fake);
-
-$usefulCron->cleanDir('./log', 0);
+$usefulCron = new UsefulCron($config);
+$usefulCron->run('');

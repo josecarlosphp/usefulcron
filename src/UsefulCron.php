@@ -15,18 +15,18 @@ class UsefulCron
     const EXTENSIONS_MODE_INCLUDE = 'include';
     const EXTENSIONS_MODE_EXCLUDE = 'exclude';
 
+    /**
+     * @var bool
+     */
     private $initiated = false;
-    private $dirLog = null;
-    private $debug = false;
-    private $fake = false;
+    /**
+     * @var josecarlosphp\usefulcron\Config
+     */
+    private $config = null;
 
-    public function __construct($init = true)
+    public function __construct(Config $config = null)
     {
-        $this->dirLog = getcwd() . '/log/';
-
-        if ($init) {
-            //$this->init();
-        }
+        $this->config = is_null($config) ? new Config() : clone $config;
     }
 
     public function __destruct()
@@ -35,38 +35,45 @@ class UsefulCron
             $this->Msg('CRON FINISHED');
         }
     }
-
-    private function prop($prop, $val = null)
+    /**
+     * @param josecarlosphp\usefulcron\Config $config
+     * @return josecarlosphp\usefulcron\Config
+     */
+    public function &config(Config $config = null)
     {
-        if (!is_null($val)) {
-            switch ($prop) {
-                case 'dirLog':
-                    $len = mb_strlen($val);
-                    if ($len == 0 || mb_substr($val, $len-1) != '/') {
-                        $val .= '/';
-                    }
-                    break;
-            }
-            $this->$prop = $val;
-            $this->Msg(sprintf('%s = %s', $prop, $val));
+        if (!is_null($config)) {
+            $this->config = clone $config;
         }
 
-        return $this->$prop;
+        return $this->config;
     }
 
-    public function dirLog($val)
+    public function configVal($q, $val = null)
     {
-        return $this->prop(__FUNCTION__, $val);
+        if (!property_exists('josecarlosphp\usefulcron\Config', $q)) {
+            throw new \Exception('Property does not exist in Config class (' . $q . ')');
+        }
+
+        if (!is_null($val)) {
+            $this->Msg(sprintf('%s = %s', $q, $val));
+        }
+
+        return $this->config->$q($val);
     }
 
-    public function debug($val)
+    public function dirLog($val = null)
     {
-        return $this->prop(__FUNCTION__, $val);
+        return $this->configVal(__FUNCTION__, $val);
     }
 
-    public function fake($val)
+    public function debug($val = null)
     {
-        return $this->prop(__FUNCTION__, $val);
+        return $this->configVal(__FUNCTION__, $val);
+    }
+
+    public function fake($val = null)
+    {
+        return $this->configVal(__FUNCTION__, $val);
     }
 
     public function Msg($message, $type = self::MESSAGE_TYPE_INFO, $log = true)
@@ -87,7 +94,7 @@ class UsefulCron
 
     public function MsgDbg($message, $type = self::MESSAGE_TYPE_INFO)
     {
-        if ($this->debug) {
+        if ($this->debug()) {
             $this->Msg($message, $type);
         }
     }
@@ -99,7 +106,7 @@ class UsefulCron
 
     public function Log($message, $type = self::MESSAGE_TYPE_INFO)
     {
-        $dir = $this->dirLog . date('Y/m/');
+        $dir = $this->dirLog() . date('Y/m/');
         if (\josecarlosphp\utils\Files::makeDir($dir)) {
             if (($fp = fopen($dir . date('Y-m-d') . '.usefulcron.log', 'a'))) {
                 $r = fwrite($fp, self::msg2line($message, $type));
@@ -118,6 +125,22 @@ class UsefulCron
             $this->initiated = true;
             header('Content-Type: text/plain; charset=UTF-8');
             $this->Msg('CRON STARTED');
+        }
+    }
+
+    public function run($token = null, $codeOnNoAuth = 401)
+    {
+        if (!is_null($token)) {
+            $this->checkAuth($token, $codeOnNoAuth);
+        }
+
+        foreach ($this->config->dirsToClean() as $dirToClean) {
+            $this->cleanDir(
+                $dirToClean->path(),
+                $dirToClean->timeThreshold(),
+                $dirToClean->extensions(),
+                $dirToClean->extensionsMode()
+            );
         }
     }
 
@@ -176,12 +199,12 @@ class UsefulCron
         exit;
     }
 
-    public function cleanDir($dir, $timeThreshold, $extensions = array('php', 'htaccess'), $extensionsMode = self::EXTENSIONS_MODE_EXCLUDE)
+    public function cleanDir($path, $timeThreshold, $extensions = array('php', 'htaccess'), $extensionsMode = self::EXTENSIONS_MODE_EXCLUDE)
     {
         $this->MsgFuncArgs(
             __FUNCTION__,
             array(
-                'dir' => $dir,
+                'path' => $path,
                 'timeThreshold' => $timeThreshold,
                 'extensions' => $extensions,
                 'extensionsMode' => $extensionsMode,
@@ -193,17 +216,17 @@ class UsefulCron
             'deleted' => 0,
             'errors' => 0,
         );
-        if (is_dir($dir)) {
-            if (is_readable($dir)) {
+        if ($path !== '' && is_dir($path)) {
+            if (is_readable($path)) {
                 $method = $extensionsMode == self::EXTENSIONS_MODE_EXCLUDE ? 'getFiles' : 'getFilesExt';
-                $files = \josecarlosphp\utils\Files::$method($dir, $extensions, true, false);
+                $files = \josecarlosphp\utils\Files::$method($path, $extensions, true, false);
                 foreach ($files as $file) {
                     $stats['total']++;
                     $this->MsgDbg($file);
                     if (($timeThreshold == 0 || time() - filemtime($file) > $timeThreshold)) {
                         $stats['match']++;
                         $this->MsgDbg('Delete');
-                        if ($this->fake) {
+                        if ($this->fake()) {
                             $stats['deleted']++;
                             $this->MsgDbg('Ok (fake)');
                         } elseif (unlink($file)) {
