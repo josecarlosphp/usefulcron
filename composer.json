@@ -1,0 +1,26 @@
+{
+    "name": "josecarlosphp/usefulcron",
+    "description": "Useful configurable cron tasks in PHP.",
+    "keywords": [
+        "PHP", "configurable", "cron", "tasks"
+    ],
+    "homepage": "https://github.com/josecarlosphp/usefulcron",
+    "type": "library",
+    "license": "GPL-3.0",
+    "authors": [
+        {
+            "name": "José Carlos Cruz Parra",
+            "homepage": "https://josecarlosphp.com/"
+        }
+    ],
+    "autoload": {
+        "psr-4": {
+            "josecarlosphp\\usefulcron\\": "src/"
+        }
+    },
+    "require": {
+        "josecarlosphp/utils": "dev-main",
+        "josecarlosphp/db": "dev-master",
+        "phpmailer/phpmailer": "^6.8"
+    }
+}
